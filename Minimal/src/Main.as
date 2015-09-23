@@ -34,9 +34,6 @@ package
 			mTextField.height = 600;
 			this.addChild(mTextField);
 			
-			// snipe client is initially written in haxe, so we need to call this constructor function to do some initialization
-			new flash.Boot();
-			
 			// Creating client
 			log("Creating client...");
 			
