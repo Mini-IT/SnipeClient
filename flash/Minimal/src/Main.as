@@ -1,6 +1,5 @@
 package 
 {
-	import flash.Boot;
 	import flash.display.Sprite;
 	import flash.events.Event;
 	import flash.text.TextField;
