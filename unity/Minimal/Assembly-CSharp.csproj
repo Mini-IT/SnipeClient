@@ -63,7 +63,7 @@
  <HintPath>D:/Snipe/SnipeClient/unity/Minimal/Assets/Lib/Ionic.Zlib.dll</HintPath>
  </Reference>
  <Reference Include="websocket-sharp">
- <HintPath>D:/Snipe/SnipeClient/unity/Minimal/Assets/Plugins/websocket-sharp.dll</HintPath>
+ <HintPath>D:/Snipe/SnipeClient/unity/Minimal/Assets/Lib/websocket-sharp.dll</HintPath>
  </Reference>
  <Reference Include="Mono.Cecil">
  <HintPath>C:/Program Files/Unity/Editor/Data/Managed/Mono.Cecil.dll</HintPath>
