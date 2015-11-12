@@ -1,9 +1,9 @@
 ﻿<Properties>
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
-  <MonoDevelop.Ide.Workbench ActiveDocument="Assets\Scripts\MainApp.cs">
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets\Scripts\MiniIT\Snipe\SnipeClient.cs">
     <Files>
-      <File FileName="Assets\Scripts\MainApp.cs" Line="41" Column="34" />
-      <File FileName="Assets\Scripts\MiniIT\Snipe\SnipeClient.cs" Line="241" Column="37" />
+      <File FileName="Assets\Scripts\MiniIT\Snipe\SnipeClient.cs" Line="469" Column="9" />
+      <File FileName="Assets\Scripts\MainApp.cs" Line="26" Column="56" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>

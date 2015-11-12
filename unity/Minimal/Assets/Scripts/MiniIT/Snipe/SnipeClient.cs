@@ -7,6 +7,7 @@ using System.Text;
 using UnityEngine;
 using Ionic.Zlib;
 using MiniIT;
+using WebSocketSharp;
 
 //
 // Client to Snipe server
@@ -16,6 +17,10 @@ using MiniIT;
 
 // Docs on how to use TCP Client:
 // http://sunildube.blogspot.ru/2011/12/asynchronous-tcp-client-easy-example.html
+
+// WebSocket
+// https://github.com/sta/websocket-sharp
+// http://pythonhackers.com/p/methane/websocket-sharp#websocket-client
 
 namespace MiniIT.Snipe
 {
@@ -33,12 +38,14 @@ namespace MiniIT.Snipe
 
 		#pragma warning restore 0067
 
-		private TcpClient mClient = null;
+		private TcpClient mTcpClient = null;
 		private bool mConnected = false;
 
 		private static readonly int RECEIVE_BUFFER_SIZE = 66560; // buffer size = 65 Kb
 		private static readonly int MESSAGE_BUFFER_SIZE = 307200; // buffer size = 300 Kb
 		private static readonly byte[] MESSAGE_MARKER = new byte[]{0xAA, 0xBB, 0xCD, 0xEF}; // marker of message beginning
+
+		private WebSocket mWebSocket = null;
 
 		protected MemoryStream mBufferSream;
 
@@ -66,7 +73,7 @@ namespace MiniIT.Snipe
 				}
 				catch(Exception e)
 				{
-					Debug.Log("[HapiClient] DispatchEvent error: " + e.ToString() + e.Message + "\nErrorData: " + data.ToJSONString());
+					Debug.Log("[SnipeClient] DispatchEvent error: " + e.ToString() + e.Message + "\nErrorData: " + data.ToJSONString());
 				}
 			}
 		}
@@ -77,25 +84,106 @@ namespace MiniIT.Snipe
 
 			try
 			{
-				if (mClient == null)
+				if (mTcpClient == null)
 				{
-					mClient = new TcpClient(AddressFamily.InterNetwork);
-					mClient.ReceiveBufferSize = RECEIVE_BUFFER_SIZE;
-					mClient.NoDelay = true;  // send data immediately upon calling NetworkStream.Write
+					mTcpClient = new TcpClient(AddressFamily.InterNetwork);
+					mTcpClient.ReceiveBufferSize = RECEIVE_BUFFER_SIZE;
+					mTcpClient.NoDelay = true;  // send data immediately upon calling NetworkStream.Write
 				}
 
 				IPAddress[] host_address = Dns.GetHostAddresses(host);
 				//Start the async connect operation
-				mClient.BeginConnect(host_address, port, new AsyncCallback(ConnectCallback), mClient);
+				mTcpClient.BeginConnect(host_address, port, new AsyncCallback(ConnectCallback), mTcpClient);
 			}
 			catch (Exception e)
 			{
-				Debug.Log("[HapiClient] TCP Client initialization faled: " + e.Message);
+				Debug.Log("[SnipeClient] TCP Client initialization faled: " + e.Message);
 
 //				if (this.OnConnectionFailed != null)
 //					OnConnectionFailed(new HapiEventArgs(HapiEventArgs.CONNECT_FAILED, "Connection Failed: " + e.Message));
 				DispatchEvent(ConnectionFailed);
 			}
+		}
+
+		public void ConnectWebSocket(string host, int port)
+		{
+			string url = host.ToLower();
+			if (!url.StartsWith("ws://"))
+			{
+				url = url.Replace("http://", "ws://").Replace("https://", "ws://");
+				if (!url.StartsWith("ws://"))
+					url = "ws://" + url;
+			}
+			if (url.EndsWith("/"))
+				url = url.Substring(0, url.Length - 1);
+			url += ":" + port.ToString() + "/";
+
+			ConnectWebSocket(url);
+		}
+
+		public void ConnectWebSocket(string url)
+		{
+			Disconnect();
+
+#if DEBUG
+			Debug.Log("[SnipeClient] WebSocket Connect to " + url);
+#endif
+
+			mWebSocket = new WebSocket(url);
+			mWebSocket.OnOpen += OnWebSocketConnected;
+			mWebSocket.OnClose += OnWebSocketClose;
+			mWebSocket.OnError += OnWebSocketError;
+			mWebSocket.OnMessage += OnWebSocketMessage;
+			mWebSocket.ConnectAsync();
+		}
+
+		protected void OnWebSocketConnected (object sender, EventArgs e)
+		{
+			if (mWebSocket == null || !mWebSocket.IsAlive)
+			{
+				DispatchEvent(ConnectionFailed);
+				return;
+			}
+
+#if DEBUG
+			//Debug.Log("[SnipeClient] OnWebSocketConnected");
+#endif
+
+			if (mBufferSream == null)
+			{
+				mBufferSream = new MemoryStream();
+				mBufferSream.Capacity = MESSAGE_BUFFER_SIZE;
+			}
+			else
+			{
+				mBufferSream.SetLength(0);  // "clearing" buffer
+			}
+			
+			mConnected = true;
+
+			// send event
+			DispatchEvent(ConnectionSucceeded);
+		}
+		
+		protected void OnWebSocketClose (object sender, CloseEventArgs e)
+		{
+			//Debug.Log("[SnipeClient] OnWebSocketClose");
+
+			if (this.mConnected)
+			{
+				this.mConnected = false;
+				DispatchEvent(ConnectionLost);
+			}
+			else
+			{
+				DispatchEvent(ConnectionFailed);
+			}
+		}
+
+		protected void OnWebSocketError (object sender, WebSocketSharp.ErrorEventArgs e)
+		{
+			Debug.Log("[SnipeClient] OnWebSocketError: " + e.Message);
+			//DispatchEvent(ErrorHappened);
 		}
 
 		public void Disconnect()
@@ -107,13 +195,26 @@ namespace MiniIT.Snipe
 				mBufferSream = null;
 			}
 
-			if (mClient != null)
-			{
-//				if (mClient.Connected)
-//					mClient.EndConnect(null);
+			mMessageLength = 0;
+			mMessageString = "";
 
-				mClient.Close();
-				mClient = null;
+			if (mTcpClient != null)
+			{
+//				if (mTcpClient.Connected)
+//					mTcpClient.EndConnect(null);
+
+				mTcpClient.Close();
+				mTcpClient = null;
+			}
+
+			if (mWebSocket != null)
+			{
+				mWebSocket.Close();
+				mWebSocket.OnOpen -= OnWebSocketConnected;
+				mWebSocket.OnClose -= OnWebSocketClose;
+				mWebSocket.OnError -= OnWebSocketError;
+				mWebSocket.OnMessage -= OnWebSocketMessage;
+				mWebSocket = null;
 			}
 		}
 
@@ -122,9 +223,9 @@ namespace MiniIT.Snipe
 			try
 			{
 				//We are connected successfully
-				NetworkStream network_stream = mClient.GetStream();
+				NetworkStream network_stream = mTcpClient.GetStream();
 
-				byte[] buffer = new byte[mClient.ReceiveBufferSize];
+				byte[] buffer = new byte[mTcpClient.ReceiveBufferSize];
 				
 				//Now we are connected start asyn read operation
 				network_stream.BeginRead(buffer, 0, buffer.Length, ReadCallback, buffer);
@@ -148,7 +249,7 @@ namespace MiniIT.Snipe
 			}
 			catch(Exception e)
 			{
-				Debug.Log("[HapiClient] ConnectCallback: " + e.Message);
+				Debug.Log("[SnipeClient] ConnectCallback: " + e.Message);
 
 				mConnected = false;
 
@@ -166,11 +267,11 @@ namespace MiniIT.Snipe
 			
 			try
 			{
-				network_stream = mClient.GetStream();
+				network_stream = mTcpClient.GetStream();
 			}
 			catch(Exception e)
 			{
-				Debug.Log("[HapiClient] ReadCallback GetStream error: " + e.Message);
+				Debug.Log("[SnipeClient] ReadCallback GetStream error: " + e.Message);
 				return;
 			}
 
@@ -196,7 +297,7 @@ namespace MiniIT.Snipe
 
 			//Then start reading from the network again.
 			network_stream.BeginRead(buffer, 0, buffer.Length, ReadCallback, buffer);
-      }
+		}
 
 		protected void ProcessData(MemoryStream buf_stream)
 		{
@@ -326,6 +427,90 @@ namespace MiniIT.Snipe
 			}
 		}
 
+		protected void OnWebSocketMessage (object sender, MessageEventArgs e)
+		{
+			// if (e.Type == Opcode.Binary)
+			{
+				// e.RawData contains the received data
+				
+				if (e.RawData != null && e.RawData.Length > 0)
+				{
+					using(MemoryStream buf_stream = new MemoryStream(e.RawData))
+					{
+						buf_stream.Position = 0;
+						
+						try
+						{
+							// the 1st byte contains compression flag (0/1)
+							mCompressed = (buf_stream.ReadByte() == 1);
+							mMessageLength = Convert.ToInt32(buf_stream.Length - 1);
+							
+							if (mCompressed)
+							{
+								byte[] compressed_buffer = new byte[mMessageLength];
+								buf_stream.Read(compressed_buffer, 0, compressed_buffer.Length);
+								
+								byte[] decompressed_buffer = ZlibStream.UncompressBuffer(compressed_buffer);
+								mMessageString = UTF8Encoding.UTF8.GetString( decompressed_buffer );
+								
+#if DEBUG
+								//Debug.Log("[SnipeClient] decompressed mMessageString = " + mMessageString);
+#endif
+							}
+							else
+							{
+								byte[] str_buf = new byte[mMessageLength];
+								buf_stream.Read(str_buf, 0, mMessageLength);
+								mMessageString = UTF8Encoding.UTF8.GetString(str_buf);
+								
+#if DEBUG
+								//Debug.Log("[SnipeClient] mMessageString = " + mMessageString);
+#endif
+							}
+						}
+						catch(Exception ex)
+						{
+#if DEBUG
+							//Debug.Log("[SnipeClient] OnWebSocketMessage ProcessData error: " + ex.Message);
+#endif
+							//CheckConnectionLost();
+						}
+
+						mMessageLength = 0;
+						
+						// the message is read
+						
+						try
+						{
+							ExpandoObject response = (ExpandoObject)HaxeUnserializer.Run(mMessageString);
+							
+							if (response != null)
+							{
+								DispatchEvent(DataReceived, response);
+							}
+						}
+						catch (Exception error)
+						{
+#if DEBUG
+							Debug.Log("[SnipeClient] Deserialization error: " + error.Message);
+#endif
+							
+//							if (OnError != null)
+//								OnError(new HapiEventArgs(HapiEventArgs.ERROR, "Deserialization error: " + error.Message));
+							
+							// TODO: handle the error !!!!
+							// ...
+							
+							// if something wrong with the format then clear buffer of the socket and remove all temporary data,
+							// i.e. just ignore all that we have at the moment and we'll wait new messages
+							AccidentallyClearBuffer();
+							return;
+						}
+					}
+				}
+			}
+		}
+
 		public void SendRequest(string message_type)
 		{
 			SendRequest(message_type, null);
@@ -347,7 +532,7 @@ namespace MiniIT.Snipe
 
 		public void SendRequest(ExpandoObject parameters)
 		{
-			// mClient.Connected property gets the connection state of the Socket as of the LAST I/O operation (not current state!)
+			// mTcpClient.Connected property gets the connection state of the Socket as of the LAST I/O operation (not current state!)
 			// (http://msdn.microsoft.com/en-us/library/system.net.sockets.socket.connected.aspx)
 			// So we need to check the connection availability manually, and here is where we can do it
 
@@ -355,21 +540,37 @@ namespace MiniIT.Snipe
 			{
 				string message = HaxeSerializer.Run(parameters);
 
-				byte[] buffer = UTF8Encoding.UTF8.GetBytes(message);
-				mClient.GetStream().Write(buffer, 0, buffer.Length);
-				mClient.GetStream().WriteByte(0);  // every message ends with zero
-
+				if (mTcpClient != null)
+				{
+					byte[] buffer = UTF8Encoding.UTF8.GetBytes(message);
+					mTcpClient.GetStream().Write(buffer, 0, buffer.Length);
+					mTcpClient.GetStream().WriteByte(0);  // every message ends with zero
+				}
+				else if (mWebSocket != null)
+				{
+					Debug.Log("[SnipeClient] WebSocket send " + message);
+					mWebSocket.Send(message);
+				}
 #if DEBUG
                 //Debug.Log("[SnipeClient] sent " + message);
 #endif
 			}
-			else if (mConnected && !(mClient != null && mClient.Connected))
+			else
+			{
+				CheckConnectionLost();
+			}
+		}
+
+		protected bool CheckConnectionLost()
+		{
+			if (mConnected && !((mTcpClient != null && mTcpClient.Connected) || (mWebSocket != null && mWebSocket.IsAlive)))
 			{
 				// Disconnect detected
 				mConnected = false;
 				DispatchEvent(ConnectionLost);
-				return;
+				return true;
 			}
+			return false;
 		}
 
 		protected void AccidentallyClearBuffer()
@@ -385,7 +586,9 @@ namespace MiniIT.Snipe
 		{
 			get
 			{
-				return mConnected && mClient != null && mClient.Connected;
+				return mConnected &&
+					(mTcpClient != null && mTcpClient.Connected) ||
+					(mWebSocket != null && mWebSocket.IsAlive);
 			}
 		}
 

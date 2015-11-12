@@ -6,7 +6,7 @@ using MiniIT.Snipe;
 public class MainApp : MonoBehaviour
 {
 	private const string SERVER_HOST = "192.168.0.100";
-	private const int    SERVER_PORT = 3010;
+	private const int    SERVER_PORT = 2501;
 
 	private SnipeClient mClient;
 
@@ -22,7 +22,9 @@ public class MainApp : MonoBehaviour
 		mClient.DataReceived += OnServerResponse;
 
 		// Trying to connect
-		mClient.Connect(SERVER_HOST, SERVER_PORT);
+		mClient.Connect(SERVER_HOST, SERVER_PORT);  // connect using TCP Client
+		//mClient.ConnectWebSocket(SERVER_HOST, SERVER_PORT);    // connent using WebSocket
+		//mClient.ConnectWebSocket("ws://192.168.0.100:2501/");  // connent using WebSocket
 	}
 
 	void OnConnected (DataEventArgs data)
@@ -49,5 +51,11 @@ public class MainApp : MonoBehaviour
 	void OnServerResponse (DataEventArgs data)
 	{
 		Debug.Log("Server says: " + data.Data.ToJSONString());
+	}
+
+	void OnApplicationQuit()
+	{
+		if (mClient != null)
+			mClient.Disconnect();
 	}
 }
