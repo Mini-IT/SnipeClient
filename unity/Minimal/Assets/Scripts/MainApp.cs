@@ -22,6 +22,8 @@ public class MainApp : MonoBehaviour
 		mClient.DataReceived += OnServerResponse;
 
 		// Trying to connect
+		Log("Trying to connect");
+
 		mClient.Connect(SERVER_HOST, SERVER_PORT);  // connect using TCP Client
 		//mClient.ConnectWebSocket(SERVER_HOST, SERVER_PORT);    // connent using WebSocket
 		//mClient.ConnectWebSocket("ws://192.168.0.100:2501/");  // connent using WebSocket
@@ -29,7 +31,7 @@ public class MainApp : MonoBehaviour
 
 	void OnConnected (DataEventArgs data)
 	{
-		Debug.Log("Connected successfully");
+		Log("Connected successfully");
 
 		// trying to send request
 		ExpandoObject parameters = new ExpandoObject();
@@ -40,17 +42,17 @@ public class MainApp : MonoBehaviour
 
 	void OnConnectionFailed (DataEventArgs data)
 	{
-		Debug.Log("Connection failed");
+		Log("Connection failed");
 	}
 
 	void OnConnectionLost (DataEventArgs data)
 	{
-		Debug.Log("Connection lost");
+		Log("Connection lost");
 	}
 
 	void OnServerResponse (DataEventArgs data)
 	{
-		Debug.Log("Server says: " + data.Data.ToJSONString());
+		Log("Server says: " + data.Data.ToJSONString());
 	}
 
 	void OnApplicationQuit()
@@ -58,4 +60,21 @@ public class MainApp : MonoBehaviour
 		if (mClient != null)
 			mClient.Disconnect();
 	}
+
+	#region Log
+	
+	private string mLog = "";
+	
+	void Log(string text)
+	{
+		Debug.Log(text);
+		mLog += text + "\n";
+	}
+	
+	void OnGUI()
+	{
+		mLog = GUI.TextArea(new Rect (10, 10, Screen.width-20, Screen.height-20), mLog);
+	}
+	
+	#endregion
 }
