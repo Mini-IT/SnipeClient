@@ -591,6 +591,14 @@ namespace MiniIT.Snipe
 					(mWebSocket != null && mWebSocket.IsAlive);
 			}
 		}
+		
+		public bool ConnectedViaWebSocket
+		{
+			get
+			{
+				return mConnected && (mWebSocket != null && mWebSocket.IsAlive);
+			}
+		}
 
 		#region IDisposable implementation
 		
