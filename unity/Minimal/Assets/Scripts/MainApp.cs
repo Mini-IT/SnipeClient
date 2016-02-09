@@ -12,8 +12,10 @@ public class MainApp : MonoBehaviour
 
 	void Start ()
 	{
+		Log("Start");
+
 		// Creating client
-		mClient = new SnipeClient();
+		mClient = SnipeClient.Instance; //new SnipeClient();
 
 		// Adding events listeners
 		mClient.ConnectionSucceeded += OnConnected;
@@ -24,8 +26,8 @@ public class MainApp : MonoBehaviour
 		// Trying to connect
 		Log("Trying to connect");
 
-		mClient.Connect(SERVER_HOST, SERVER_PORT);  // connect using TCP Client
-		//mClient.ConnectWebSocket(SERVER_HOST, SERVER_PORT);    // connent using WebSocket
+		//mClient.Connect(SERVER_HOST, SERVER_PORT);  // connect using TCP Client
+		mClient.ConnectWebSocket(SERVER_HOST, SERVER_PORT);    // connent using WebSocket
 		//mClient.ConnectWebSocket("ws://192.168.0.100:2501/");  // connent using WebSocket
 	}
 
