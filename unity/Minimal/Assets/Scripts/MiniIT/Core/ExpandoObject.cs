@@ -18,8 +18,8 @@ namespace MiniIT
 {
 	public class ExpandoObject : IDisposable // ICloneable
 	{
-		protected Dictionary <string, object> mMembers = new Dictionary <string, object>();
-		public Dictionary <string, object> Members
+		protected IDictionary <string, object> mMembers = new Dictionary <string, object>();
+		public IDictionary <string, object> Members
 		{
 			get { return mMembers; }
 		}
@@ -28,7 +28,7 @@ namespace MiniIT
 		{
 		}
 
-		public ExpandoObject(Dictionary <string, object> members)
+		public ExpandoObject(IDictionary <string, object> members)
 		{
 			mMembers = members;
 		}
