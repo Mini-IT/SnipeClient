@@ -371,6 +371,11 @@ namespace MiniIT.Snipe
 	
 		public void Disconnect()
 		{
+			DisconnectAndDispatch(null);
+		}
+		
+		public void DisconnectAndDispatch(SnipeServerEventHandler event_to_dispatch)
+		{
 			if (mBufferSream != null)
 			{
 				mBufferSream.Close();
@@ -403,6 +408,9 @@ namespace MiniIT.Snipe
 				mWebSocket = null;
 			}
 #endif
+			
+			if (event_to_dispatch != null)
+				DispatchEvent(event_to_dispatch);
 		}
 
 		private void ConnectCallback(IAsyncResult result)
