@@ -8,7 +8,7 @@ using System.Text;
 using UnityEngine;
 using Ionic.Zlib;
 using MiniIT;
-#if UNITY_WEBGL && !UNITY_EDITOR // && !UNITY_EDITOR
+#if UNITY_WEBGL && !UNITY_EDITOR
 using System.Runtime.InteropServices;
 #else
 using WebSocketSharp;
@@ -450,6 +450,11 @@ namespace MiniIT.Snipe
 		// Callback for Read operation
 		private void ReadCallback(IAsyncResult result)
 		{
+			// ReadCallback is called asyncronously. That is why sometimes it could be called after disconnect and mTcpClient disposal.
+			// Just ignoring and waiting for the next connection
+			if (mTcpClient == null)
+				return;
+			
 			NetworkStream network_stream;
 			
 			try
@@ -459,6 +464,7 @@ namespace MiniIT.Snipe
 			catch(Exception e)
 			{
 				Debug.Log("[SnipeClient] ReadCallback GetStream error: " + e.Message);
+				DisconnectAndDispatch(ConnectionLost);
 				return;
 			}
 
@@ -490,7 +496,7 @@ namespace MiniIT.Snipe
 		{
 			
 #if DEBUG
-            //Debug.Log("[SnipeClient] portion", buf_stream.Length.ToString());
+			//Debug.Log("[SnipeClient] portion", buf_stream.Length.ToString());
 #endif
 			if (mBufferSream == null)
 				return;
@@ -546,7 +552,7 @@ namespace MiniIT.Snipe
 				else if (mMessageLength > 0 && (mBufferSream.Length - mBufferSream.Position) >= mMessageLength)  // if the legth of the message is known and the whole message is already in the buffer
 				{
 #if DEBUG
-                    //Debug.Log("[SnipeClient] Message found");
+					//Debug.Log("[SnipeClient] Message found");
 #endif
 					// if the message is compressed
 					if (mCompressed)
